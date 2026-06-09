@@ -9,7 +9,8 @@ from dotenv import load_dotenv
 
 load_dotenv()
 
-client = anthropic.Anthropic(api_key=os.getenv("ANTHROPIC_API_KEY"))
+def get_client():
+    return anthropic.Anthropic(api_key=os.getenv("ANTHROPIC_API_KEY"))
 
 MODEL = "claude-sonnet-4-5"
 MAX_TOKENS = 1000
@@ -52,7 +53,7 @@ Be direct and specific. Use actual numbers from the data. No filler phrases. No 
 def generate_situation_brief(data_context: dict) -> str:
     try:
         context_str = json.dumps(data_context, indent=2, default=str)
-        message = client.messages.create(
+        message = get_client().messages.create(
             model=MODEL,
             max_tokens=MAX_TOKENS,
             system=SYSTEM_PROMPT,
@@ -80,7 +81,7 @@ def chat(question: str, data_context: dict, conversation_history: list) -> str:
                 "content": f"Current business data:\n{context_str}\n\nQuestion: {question}",
             }
         )
-        response = client.messages.create(
+        response = get_client().messages.create(
             model=MODEL,
             max_tokens=MAX_TOKENS,
             system=SYSTEM_PROMPT,
