@@ -1,91 +1,147 @@
 """
-Reads SalesLeads from SharePoint and computes weighted pipeline metrics.
-Uses read_excel_table from Finance Agent client pattern exclusively.
+Reads SalesLeads from SharePoint using exact Sales Agent credentials and pattern.
 """
-from sharepoint.client import read_excel_table, _get_creds
+import os
+import requests
+from sharepoint.client import _get_access_token
 
-SALES_TABLE_NAME = "SalesLeads"
+SALES_DRIVE_ID = os.getenv("SALES_DRIVE_ID", "b!KnA__iPt-kigosnQX5gqVLkPI2LXg71Oudeh0sTPzHqDLpOUO7P6QKEGYrAjFE-1")
+SALES_FILE_ID  = os.getenv("SALES_FILE_ID",  "01RSC2PJCYQ77XTEZMNFAJSBN6OXEJ3VR3")
+TABLE_NAME     = "SalesLeads"
+
+COLUMNS = [
+    "id", "venue_name", "name", "stage", "owner", "category", "type", "visibility",
+    "source", "address", "phone", "website", "email", "instagram", "contact_name",
+    "notes", "additional_info", "next_action", "next_action_due", "last_contact",
+    "outreach_draft", "outreach_medium", "created_at", "updated_at", "fit_score",
+    "franchise_status",
+]
 
 STAGE_WEIGHTS = {
-    "Closed Won": 1.0,
+    "Active":      1.0,
     "In Progress": 0.6,
-    "Warm Lead": 0.3,
-    "Cold Lead": 0.1,
-    "Dead": 0.0,
+    "Warm Lead":   0.3,
+    "Contacted":   0.1,
+    "Prospect":    0.05,
 }
+
+WHOLESALE_BAGS = {
+    "Active":      24,
+    "In Progress": 18,
+    "Warm Lead":   12,
+    "Contacted":   12,
+    "Prospect":    12,
+}
+
+STAGE_ORDER = ["Active", "In Progress", "Warm Lead", "Contacted", "Prospect"]
 
 DEFAULT_PRICE_PER_BAG = 17.49
 
 
-def get_pipeline_data() -> dict:
+def _load_leads() -> list[dict]:
     try:
-        c = _get_creds()
-        rows = read_excel_table(
-            site_id    = c.get("FINANCE_SITE_ID", ""),
-            file_id    = c.get("SALES_FILE_ID", ""),
-            table_name = SALES_TABLE_NAME,
+        token = _get_access_token()
+        url = (
+            f"https://graph.microsoft.com/v1.0/drives/{SALES_DRIVE_ID}"
+            f"/items/{SALES_FILE_ID}/workbook/tables/{TABLE_NAME}/rows"
         )
-    except Exception as e:
+        resp = requests.get(url, headers={"Authorization": f"Bearer {token}"}, timeout=20)
+        resp.raise_for_status()
+        rows = resp.json().get("value", [])
+        result = []
+        for row in rows:
+            values = row.get("values", [[]])[0]
+            entry = {}
+            for i, col in enumerate(COLUMNS):
+                val = values[i] if i < len(values) else None
+                entry[col] = val if val not in ("", None) else None
+            if entry.get("id"):
+                result.append(entry)
+        return result
+    except Exception:
+        return []
+
+
+def get_pipeline_data() -> dict:
+    leads = _load_leads()
+
+    if not leads:
         return {
-            "error": str(e),
             "total_weighted_value": 0.0,
             "active_count": 0,
             "in_progress_count": 0,
             "warm_lead_count": 0,
-            "top_opportunity": "N/A",
+            "top_opportunity": "No leads loaded",
             "reorder_urgency": "unknown",
             "leads": [],
+            "raw_leads": [],
+            "source": "SalesLeads SharePoint",
         }
 
-    total_weighted = 0.0
-    active_count = 0
+    total_weighted    = 0.0
+    active_count      = 0
     in_progress_count = 0
-    warm_lead_count = 0
-    top_opportunity = None
-    top_opportunity_value = 0.0
-    leads = []
+    warm_lead_count   = 0
+    top_opportunity   = None
+    top_value         = 0.0
+    enriched_leads    = []
 
-    for row in rows:
-        stage = row.get("Stage", "Cold Lead")
-        venue = row.get("VenueName", row.get("Venue", "Unknown"))
-        expected_bags = float(row.get("ExpectedBags", row.get("Bags", 0)) or 0)
-        price_per_bag = float(row.get("PricePerBag", DEFAULT_PRICE_PER_BAG) or DEFAULT_PRICE_PER_BAG)
+    for lead in leads:
+        stage      = lead.get("stage") or "Prospect"
+        venue      = lead.get("venue_name") or lead.get("name") or "Unknown"
+        fit_score  = float(lead.get("fit_score") or 5)
+        franchise  = str(lead.get("franchise_status") or "").lower() == "franchise"
+        weight     = STAGE_WEIGHTS.get(stage, 0.05)
+        bags       = WHOLESALE_BAGS.get(stage, 12)
+        fit_mult   = fit_score / 10.0
+        franchise_mult = 0.7 if franchise else 1.0
 
-        weight = STAGE_WEIGHTS.get(stage, 0.1)
-        deal_value = expected_bags * price_per_bag
-        weighted_value = deal_value * weight
+        if stage == "Active":
+            weighted_value = bags * DEFAULT_PRICE_PER_BAG
+        else:
+            weighted_value = bags * DEFAULT_PRICE_PER_BAG * weight * fit_mult * franchise_mult
 
         total_weighted += weighted_value
 
-        if stage not in ("Dead", "Closed Won"):
+        if stage in ("Active", "In Progress"):
             active_count += 1
         if stage == "In Progress":
             in_progress_count += 1
         if stage == "Warm Lead":
             warm_lead_count += 1
 
-        if weighted_value > top_opportunity_value and stage != "Dead":
-            top_opportunity_value = weighted_value
-            top_opportunity = f"{venue} (~${weighted_value:,.0f} weighted)"
+        if stage != "Active" and weighted_value > top_value:
+            top_value = weighted_value
+            top_opportunity = f"{venue} ({stage}, fit {fit_score:.0f}/10, ~${weighted_value:,.0f})"
 
-        leads.append({
+        enriched_leads.append({
+            "id": lead.get("id"),
             "venue": venue,
             "stage": stage,
-            "expected_bags": expected_bags,
-            "price_per_bag": price_per_bag,
-            "deal_value": deal_value,
-            "weighted_value": weighted_value,
-            "weight": weight,
-            "contact": row.get("ContactName", row.get("Contact", "")),
-            "notes": row.get("Notes", ""),
+            "stage_order": STAGE_ORDER.index(stage) if stage in STAGE_ORDER else 99,
+            "fit_score": fit_score,
+            "franchise": franchise,
+            "weighted_value": round(weighted_value, 2),
+            "bags": bags,
+            "category": lead.get("category") or "",
+            "owner": lead.get("owner") or "",
+            "contact": lead.get("contact_name") or "",
+            "phone": lead.get("phone") or "",
+            "email": lead.get("email") or "",
+            "next_action": lead.get("next_action") or "",
+            "next_action_due": lead.get("next_action_due") or "",
+            "last_contact": lead.get("last_contact") or "",
+            "notes": lead.get("notes") or "",
+            "visibility": lead.get("visibility") or "",
+            "outreach_draft": lead.get("outreach_draft") or "",
         })
 
-    leads.sort(key=lambda x: x["weighted_value"], reverse=True)
+    enriched_leads.sort(key=lambda x: (x["stage_order"], -x["weighted_value"]))
 
-    if total_weighted > 3000:
-        reorder_urgency = "high — pipeline demand warrants reorder soon"
-    elif total_weighted > 1000:
-        reorder_urgency = "moderate — monitor closely"
+    if total_weighted > 180 * DEFAULT_PRICE_PER_BAG:
+        reorder_urgency = "high"
+    elif total_weighted > 90 * DEFAULT_PRICE_PER_BAG:
+        reorder_urgency = "medium"
     else:
         reorder_urgency = "low"
 
@@ -94,7 +150,8 @@ def get_pipeline_data() -> dict:
         "active_count": active_count,
         "in_progress_count": in_progress_count,
         "warm_lead_count": warm_lead_count,
-        "top_opportunity": top_opportunity or "No active leads",
+        "top_opportunity": top_opportunity or "No open opportunities",
         "reorder_urgency": reorder_urgency,
-        "leads": leads,
+        "leads": enriched_leads,
+        "source": "SalesLeads SharePoint",
     }

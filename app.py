@@ -315,7 +315,7 @@ with tab_ops:
         rows_html = ""
         for lead in leads[:10]:
             css = stage_css.get(lead["stage"], "stage-cold")
-            rows_html += f'<div class="pipeline-row"><span>{lead["venue"]}</span><span><span class="stage-badge {css}">{lead["stage"]}</span></span><span>{lead["expected_bags"]:.0f} bags</span><span>${lead["weighted_value"]:,.0f}</span></div>'
+            rows_html += f'<div class="pipeline-row"><span>{lead["venue"]}</span><span><span class="stage-badge {css}">{lead["stage"]}</span></span><span>{lead["bags"]:.0f} bags</span><span>${lead["weighted_value"]:,.0f}</span></div>'
         st.markdown(f'<div style="background:#0d1a1a; border:1px solid #1a2e2e; border-radius:8px; padding:0.75rem 1rem;"><div style="display:flex; justify-content:space-between; font-size:0.62rem; color:#3a5555; font-family:monospace; letter-spacing:0.1em; padding-bottom:0.5rem; border-bottom:1px solid #1a2a2a; text-transform:uppercase;"><span>Venue</span><span>Stage</span><span>Bags</span><span>Weighted $</span></div>{rows_html}</div>', unsafe_allow_html=True)
 
     st.markdown(f'<div class="sync-timestamp">Ops data via live_state.json · {ctx.get("timestamp", "")[:19]} UTC</div>', unsafe_allow_html=True)
@@ -370,7 +370,58 @@ with tab_finance:
 
 
 with tab_sales:
-    st.markdown('<div class="stub-card"><div style="font-size:2rem; margin-bottom:0.8rem">📊</div><div class="stub-title">Sales Agent integration coming soon</div><div class="stub-sub">Pipeline intelligence, CRM view, and outreach activity will surface here.</div></div>', unsafe_allow_html=True)
+    st.markdown('<div class="section-header">Pipeline Overview</div>', unsafe_allow_html=True)
+
+    pipeline = ctx.get("pipeline", {})
+    leads = pipeline.get("leads", [])
+
+    ps1, ps2, ps3, ps4, ps5 = st.columns(5)
+    with ps1:
+        st.markdown(f'<div class="metric-card healthy"><div class="metric-label">Weighted Value</div><div class="metric-value healthy">${pipeline.get("total_weighted_value", 0):,.0f}</div><div class="metric-sub">across all stages</div></div>', unsafe_allow_html=True)
+    with ps2:
+        st.markdown(f'<div class="metric-card healthy"><div class="metric-label">Active Partners</div><div class="metric-value healthy">{sum(1 for l in leads if l["stage"] == "Active")}</div><div class="metric-sub">wholesale live</div></div>', unsafe_allow_html=True)
+    with ps3:
+        st.markdown(f'<div class="metric-card warning"><div class="metric-label">In Progress</div><div class="metric-value warning">{pipeline.get("in_progress_count", 0)}</div><div class="metric-sub">needs close</div></div>', unsafe_allow_html=True)
+    with ps4:
+        st.markdown(f'<div class="metric-card warning"><div class="metric-label">Warm Leads</div><div class="metric-value warning">{pipeline.get("warm_lead_count", 0)}</div><div class="metric-sub">needs outreach</div></div>', unsafe_allow_html=True)
+    with ps5:
+        st.markdown(f'<div class="metric-card"><div class="metric-label">Total Leads</div><div class="metric-value">{len(leads)}</div><div class="metric-sub">in CRM</div></div>', unsafe_allow_html=True)
+
+    st.markdown("")
+    if st.button("Who should Cameron call today?", key="cameron_call"):
+        with st.spinner("Thinking..."):
+            try:
+                from claude_client import chat as claude_chat
+                fresh_ctx = load_data_context()
+                response = claude_chat(
+                    "Who should Cameron call or contact today to move the pipeline forward? Be specific: name the venue, the stage, why it is the highest priority right now, and what Cameron should say.",
+                    fresh_ctx, []
+                )
+                st.session_state["cameron_answer"] = response
+            except Exception as e:
+                st.session_state["cameron_answer"] = f"Error: {e}"
+
+    if st.session_state.get("cameron_answer"):
+        st.markdown(f'<div class="brief-box"><div class="brief-label">Cameron Priority Call</div>{st.session_state["cameron_answer"]}</div>', unsafe_allow_html=True)
+
+    stage_order = ["Active", "In Progress", "Warm Lead", "Contacted", "Prospect"]
+    stage_css = {"Active": "stage-won", "In Progress": "stage-in-progress", "Warm Lead": "stage-warm", "Contacted": "stage-cold", "Prospect": "stage-cold"}
+
+    for stage in stage_order:
+        stage_leads = [l for l in leads if l["stage"] == stage]
+        if not stage_leads:
+            continue
+        css = stage_css.get(stage, "stage-cold")
+        st.markdown(f'<div class="section-header"><span class="stage-badge {css}">{stage}</span> &nbsp; {len(stage_leads)} leads</div>', unsafe_allow_html=True)
+        rows_html = ""
+        for lead in stage_leads:
+            fit_color = "#00C2A8" if lead["fit_score"] >= 7 else ("#FFD700" if lead["fit_score"] >= 5 else "#FF6B35")
+            franchise_tag = ' <span style="font-size:0.6rem;color:#FF6B35;border:1px solid #FF6B35;border-radius:3px;padding:1px 5px;">FRANCHISE</span>' if lead["franchise"] else ""
+            next_action = (lead["next_action"][:40] + "...") if len(lead["next_action"]) > 40 else lead["next_action"]
+            rows_html += f'<div class="pipeline-row"><span style="min-width:180px;font-weight:600">{lead["venue"]}{franchise_tag}</span><span style="min-width:120px;color:#4a7070">{lead["category"]}</span><span style="min-width:60px;color:{fit_color}">fit {lead["fit_score"]:.0f}/10</span><span style="min-width:80px;color:#00C2A8">${lead["weighted_value"]:,.0f}</span><span style="min-width:60px;color:#4a7070">{lead["owner"]}</span><span style="color:#3a5555;font-size:0.75rem">{next_action}</span></div>'
+        st.markdown(f'<div style="background:#0d1a1a;border:1px solid #1a2e2e;border-radius:8px;padding:0.75rem 1rem;margin-bottom:0.5rem;"><div style="display:flex;justify-content:space-between;font-size:0.6rem;color:#3a5555;font-family:monospace;letter-spacing:0.1em;padding-bottom:0.5rem;border-bottom:1px solid #1a2a2a;text-transform:uppercase;"><span style="min-width:180px">Venue</span><span style="min-width:120px">Category</span><span style="min-width:60px">Fit</span><span style="min-width:80px">Weighted $</span><span style="min-width:60px">Owner</span><span>Next Action</span></div>{rows_html}</div>', unsafe_allow_html=True)
+
+    st.markdown(f'<div class="sync-timestamp">CRM data via SalesLeads · {ctx.get("timestamp", "")[:19]} UTC</div>', unsafe_allow_html=True)
 
 
 with tab_marketing:
