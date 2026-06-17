@@ -5,7 +5,7 @@ Never cached — always current.
 """
 from datetime import datetime, timezone
 from sharepoint.client import read_excel_table, _get_creds, _excel_serial_to_str
-from sharepoint.state import get_live_state
+from sharepoint.state import get_live_state, get_marketing_state
 from sharepoint.pipeline import get_pipeline_data
 
 EXCLUDE_CATEGORIES = {
@@ -181,6 +181,7 @@ def get_inventory_from_state(live_state: dict) -> dict:
 
 def assemble_data_context(conversation_history: list = None) -> dict:
     live_state = get_live_state()
+    marketing_state = get_marketing_state()
     finance_summary = get_finance_summary()
     pnl = get_finance_log_summary()
     inventory = get_inventory_from_state(live_state)
@@ -205,6 +206,18 @@ def assemble_data_context(conversation_history: list = None) -> dict:
         "live_state_meta": {
             "last_updated": live_state.get("last_updated"),
             "ops_agent_status": "ok" if "error" not in live_state else "error",
+        },
+        "marketing": {
+            "gifting_roi": marketing_state.get("gifting", {}).get("overall_roi", 0),
+            "total_bags_gifted": marketing_state.get("gifting", {}).get("total_bags_gifted", 0),
+            "attributed_revenue": marketing_state.get("gifting", {}).get("total_attributed_revenue", 0),
+            "top_creator": marketing_state.get("gifting", {}).get("top_creator", ""),
+            "best_venue_type": marketing_state.get("events", {}).get("best_venue_type", ""),
+            "total_event_revenue": marketing_state.get("events", {}).get("total_event_revenue", 0),
+            "top_marketing_action": marketing_state.get("demand_signal", {}).get("top_action", ""),
+            "last_post_days_ago": marketing_state.get("social", {}).get("last_post_days_ago", 0),
+            "suppress_gifting": marketing_state.get("suppress_gifting", False),
+            "source": "marketing_state.json",
         },
         "sales_placeholder": {
             "leads": pipeline.get("leads", []),

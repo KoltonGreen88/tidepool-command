@@ -425,4 +425,84 @@ with tab_sales:
 
 
 with tab_marketing:
-    st.markdown('<div class="stub-card"><div style="font-size:2rem; margin-bottom:0.8rem">📣</div><div class="stub-title">Marketing Agent integration coming soon</div><div class="stub-sub">Creator ROI, event performance, content intelligence, and demand signals will surface here.</div></div>', unsafe_allow_html=True)
+    from sharepoint.state import get_marketing_state
+    mkt = get_marketing_state()
+    gifting = mkt.get("gifting", {})
+    events = mkt.get("events", {})
+    social = mkt.get("social", {})
+    demand = mkt.get("demand_signal", {})
+
+    if mkt.get("suppress_gifting"):
+        st.markdown('<div class="banner-warning">\u26a0 Marketing Agent: hold gifting \u2014 inventory below threshold</div>', unsafe_allow_html=True)
+
+    # SECTION 1 - GIFTING ROI
+    st.markdown('<div class="section-header">Gifting ROI</div>', unsafe_allow_html=True)
+    g1, g2, g3, g4, g5 = st.columns(5)
+    with g1:
+        st.markdown(f'<div class="metric-card"><div class="metric-label">Bags Gifted</div><div class="metric-value">{gifting.get("total_bags_gifted", 0)}</div><div class="metric-sub">total</div></div>', unsafe_allow_html=True)
+    with g2:
+        st.markdown(f'<div class="metric-card warning"><div class="metric-label">Gifting Cost</div><div class="metric-value warning">${gifting.get("total_cost", 0):,.2f}</div><div class="metric-sub">COGS</div></div>', unsafe_allow_html=True)
+    with g3:
+        st.markdown(f'<div class="metric-card"><div class="metric-label">Attributed Rev</div><div class="metric-value">${gifting.get("total_attributed_revenue", 0):,.2f}</div><div class="metric-sub">from gifting</div></div>', unsafe_allow_html=True)
+    with g4:
+        roi = gifting.get("overall_roi", 0)
+        roi_class = "healthy" if roi >= 1 else "warning"
+        roi_disp = f"{roi:.1f}:1" if roi > 0 else "\u2014"
+        st.markdown(f'<div class="metric-card {roi_class}"><div class="metric-label">Overall ROI</div><div class="metric-value {roi_class}">{roi_disp}</div><div class="metric-sub">return ratio</div></div>', unsafe_allow_html=True)
+    with g5:
+        tc = gifting.get("top_creator") or "\u2014"
+        st.markdown(f'<div class="metric-card"><div class="metric-label">Top Creator</div><div class="metric-value" style="font-size:1rem">{tc}</div><div class="metric-sub">best ROI</div></div>', unsafe_allow_html=True)
+
+    # SECTION 2 - EVENT PERFORMANCE
+    st.markdown('<div class="section-header">Event Performance</div>', unsafe_allow_html=True)
+    e1, e2, e3, e4, e5 = st.columns(5)
+    with e1:
+        st.markdown(f'<div class="metric-card"><div class="metric-label">Total Events</div><div class="metric-value">{events.get("total_events", 0)}</div><div class="metric-sub">run</div></div>', unsafe_allow_html=True)
+    with e2:
+        bvt = events.get("best_venue_type") or "\u2014"
+        st.markdown(f'<div class="metric-card healthy"><div class="metric-label">Best Venue Type</div><div class="metric-value healthy" style="font-size:1rem">{bvt}</div><div class="metric-sub">top converting</div></div>', unsafe_allow_html=True)
+    with e3:
+        st.markdown(f'<div class="metric-card"><div class="metric-label">Event Revenue</div><div class="metric-value">${events.get("total_event_revenue", 0):,.2f}</div><div class="metric-sub">attributed</div></div>', unsafe_allow_html=True)
+    with e4:
+        st.markdown(f'<div class="metric-card"><div class="metric-label">Leads</div><div class="metric-value">{events.get("total_leads", 0)}</div><div class="metric-sub">from events</div></div>', unsafe_allow_html=True)
+    with e5:
+        cr = events.get("avg_conversion_rate", 0)
+        st.markdown(f'<div class="metric-card healthy"><div class="metric-label">Avg Conversion</div><div class="metric-value healthy">{cr:.0f}%</div><div class="metric-sub">lead to sale</div></div>', unsafe_allow_html=True)
+
+    # SECTION 3 - SOCIAL SNAPSHOT
+    st.markdown('<div class="section-header">Social Snapshot</div>', unsafe_allow_html=True)
+    s1, s2, s3 = st.columns(3)
+    with s1:
+        ig_f = social.get("instagram_followers", 0)
+        ig_e = social.get("instagram_engagement_rate", 0)
+        st.markdown(f'<div class="metric-card"><div class="metric-label">Instagram</div><div class="metric-value">{ig_f:,}</div><div class="metric-sub">followers \u00b7 {ig_e:.1f}% engagement</div></div>', unsafe_allow_html=True)
+    with s2:
+        tt_f = social.get("tiktok_followers", 0)
+        tt_v = social.get("tiktok_avg_views", 0)
+        st.markdown(f'<div class="metric-card"><div class="metric-label">TikTok</div><div class="metric-value">{tt_f:,}</div><div class="metric-sub">followers \u00b7 {tt_v:,.0f} avg views</div></div>', unsafe_allow_html=True)
+    with s3:
+        days = social.get("last_post_days_ago", 0)
+        post_class = "healthy" if days < 14 else ("warning" if days < 30 else "critical")
+        st.markdown(f'<div class="metric-card {post_class}"><div class="metric-label">Last Post</div><div class="metric-value {post_class}">{days}d ago</div><div class="metric-sub">cadence</div></div>', unsafe_allow_html=True)
+
+    # SECTION 4 - TOP MARKETING ACTION
+    st.markdown('<div class="section-header">Top Marketing Action</div>', unsafe_allow_html=True)
+    top_action = demand.get("top_action") or "No marketing action available."
+    st.markdown(f'<div style="background:#1a0e05;border:1px solid #FF6B35;border-left:4px solid #FF6B35;border-radius:8px;padding:1.2rem 1.4rem;color:#e0c8b0;font-size:0.88rem;line-height:1.7;">{top_action}</div>', unsafe_allow_html=True)
+
+    # SECTION 5 - DEMAND RECOMMENDATIONS
+    st.markdown('<div class="section-header">Demand Recommendations</div>', unsafe_allow_html=True)
+    d1, d2, d3 = st.columns(3)
+    with d1:
+        gr = demand.get("gifting_recommendation") or "\u2014"
+        st.markdown(f'<div style="background:#0d1a1a;border:1px solid #1a2e2e;border-radius:8px;padding:1rem;min-height:120px;"><div class="brief-label">Gifting</div><div style="color:#b0c8c8;font-size:0.82rem;line-height:1.5;">{gr}</div></div>', unsafe_allow_html=True)
+    with d2:
+        cr2 = demand.get("content_recommendation") or "\u2014"
+        st.markdown(f'<div style="background:#0d1a1a;border:1px solid #1a2e2e;border-radius:8px;padding:1rem;min-height:120px;"><div class="brief-label">Content</div><div style="color:#b0c8c8;font-size:0.82rem;line-height:1.5;">{cr2}</div></div>', unsafe_allow_html=True)
+    with d3:
+        er = demand.get("event_recommendation") or "\u2014"
+        st.markdown(f'<div style="background:#0d1a1a;border:1px solid #1a2e2e;border-radius:8px;padding:1rem;min-height:120px;"><div class="brief-label">Events</div><div style="color:#b0c8c8;font-size:0.82rem;line-height:1.5;">{er}</div></div>', unsafe_allow_html=True)
+
+    st.markdown("")
+    st.markdown('<a href="https://tidepool-marketing.streamlit.app" target="_blank" style="color:#00C2A8;font-family:monospace;font-size:0.82rem;text-decoration:none;">Open full Marketing Agent \u2192</a>', unsafe_allow_html=True)
+    st.markdown(f'<div class="sync-timestamp">Marketing data via marketing_state.json \u00b7 {mkt.get("last_updated", "")[:19]} UTC</div>', unsafe_allow_html=True)

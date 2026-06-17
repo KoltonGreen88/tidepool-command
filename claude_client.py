@@ -45,9 +45,9 @@ BRIEF_PROMPT = """Using the business data in the context JSON, generate a 3-sent
 Rules:
 - Sentence 1: cash or runway situation (the most urgent financial signal)
 - Sentence 2: the most pressing inventory or ops issue
-- Sentence 3: the highest-priority sales action to take today
+- Sentence 3: the highest-priority action to take today, weighing sales pipeline AND marketing signal. When marketing ROI or a top creator is relevant, reference it.
 
-Be direct and specific. Use actual numbers from the data. No filler phrases. No em dashes."""
+Be direct and specific. Use actual numbers from the data. Reason across all five domains: cash, inventory, pipeline, and marketing. No filler phrases. No em dashes."""
 
 
 def generate_situation_brief(data_context: dict) -> str:

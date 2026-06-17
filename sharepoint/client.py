@@ -121,6 +121,10 @@ def read_excel_table(site_id: str, file_id: str, table_name: str,
         for row_vals in all_value_rows:
             padded   = list(row_vals) + [""] * max(0, len(columns) - len(row_vals))
             row_dict = {col: padded[i] for i, col in enumerate(columns)}
+            # Exclude Test Mode records from every read (Claude context, metrics).
+            # Blank/missing TestRecord is treated as FALSE so existing data is kept.
+            if str(row_dict.get("TestRecord", "")).strip().upper() == "TRUE":
+                continue
             if any(str(v).strip() for v in row_dict.values()):
                 result.append(row_dict)
         if filters:

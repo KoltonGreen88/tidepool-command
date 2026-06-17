@@ -51,6 +51,10 @@ def _load_leads() -> list[dict]:
         result = []
         for row in rows:
             values = row.get("values", [[]])[0]
+            # Exclude Test Mode records. TestRecord is appended after the known
+            # COLUMNS; no base column holds the literal TRUE, and blank is FALSE.
+            if any(str(v).strip().upper() == "TRUE" for v in values[len(COLUMNS):]):
+                continue
             entry = {}
             for i, col in enumerate(COLUMNS):
                 val = values[i] if i < len(values) else None
