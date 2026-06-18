@@ -41,6 +41,12 @@ def _prompt(idea: Idea, metrics: dict) -> str:
         f"Estimated cost: {idea.est_cost_hours} hours, {idea.est_cost_dollars}\n"
         f"Claims to displace: {idea.displaces}\n"
         f"Live business snapshot: {metrics}\n\n"
+        "Some snapshot values carry an as-of date or an uncertainty flag (for "
+        "example cash_as_of, cash_is_stale, cash_single_account). Treat any such "
+        "value as a soft, possibly outdated input. Do NOT issue a definitive kill "
+        "on the strength of a single dated or single-source financial input such "
+        "as runway alone. Weigh it conservatively and name the uncertainty in your "
+        "reasoning rather than treating it as a settled fact.\n\n"
         "Return JSON:\n"
         "{\n"
         '  "verdict": "kill|survive",\n'

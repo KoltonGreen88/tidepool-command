@@ -22,6 +22,8 @@ TABLES = [
     ("IdeaInbox", config.IDEAINBOX_TABLE, config.IDEAINBOX_COLUMNS),
     ("OutcomeLog", config.OUTCOMELOG_TABLE, config.OUTCOMELOG_COLUMNS),
     ("Archive", config.ARCHIVE_TABLE, config.ARCHIVE_COLUMNS),
+    # Founder-updatable current cash (read-only to the triage path).
+    ("CashState", config.CASHSTATE_TABLE, config.CASHSTATE_COLUMNS),
 ]
 
 

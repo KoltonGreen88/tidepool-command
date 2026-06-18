@@ -49,7 +49,9 @@ def score(idea: Idea, reasoner: Reasoner, business_state: BusinessState) -> Idea
     """Fill the rubric fields on `idea`, applying the demotion rules. Mutates and
     returns the idea."""
     metrics = business_state.metrics()
-    available = list(metrics.keys())
+    # An outcome can only be tied to a numeric metric. Non-numeric snapshot entries
+    # (e.g. as-of dates, staleness flags) are context, not selectable ROI metrics.
+    available = [k for k, v in metrics.items() if isinstance(v, (int, float)) and not isinstance(v, bool)]
     data = extract_json(reasoner.complete(_SYSTEM, _prompt(idea, metrics, available)))
 
     idea.pro_case = (data.get("pro_case") or "").strip()

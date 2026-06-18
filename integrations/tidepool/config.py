@@ -40,6 +40,17 @@ ARCHIVE_COLUMNS = [
     "Precondition", "ResurfaceWhen", "TestRecord",
 ]
 
+# --- Founder-updatable current cash (read-only to the system) ---
+# A one-row config table the founder edits in Excel (no code change) to keep a
+# CURRENT cash balance, because the monthly FinanceSummary statement lags. The
+# triage path only READS this; it never writes here. Most recent AsOfDate wins.
+# AsOfDate should be ISO (YYYY-MM-DD); an Excel date cell (serial) is tolerated.
+CASHSTATE_TABLE = "CashState"
+CASHSTATE_COLUMNS = ["CurrentBalance", "AsOfDate", "Note"]
+
+# Cash older than this many days (by its as-of date) is flagged stale.
+CASH_STALE_DAYS = 14
+
 # --- Current top priorities (the plate) seam ---
 # Phase 1: read from live_state.json if it carries a priorities list, else fall
 # back to this founder-set default. A dedicated priorities source is a later

@@ -27,7 +27,10 @@ def render_triage_tab(st) -> None:
     if st.button("Triage my IdeaInbox", type="primary"):
         with st.spinner("Reading the inbox, scoring against live business state, killing the rest..."):
             from integrations.tidepool.triage_app import run_triage
-            st.session_state["triage_result"] = run_triage()
+            from integrations.tidepool.business_state import TidepoolBusinessState
+            bs = TidepoolBusinessState()
+            st.session_state["triage_result"] = run_triage(business_state=bs)
+            st.session_state["triage_cash_basis"] = _cash_basis_text(bs)
 
     result: TriageResult | None = st.session_state.get("triage_result")
     if result is None:
@@ -37,7 +40,28 @@ def render_triage_tab(st) -> None:
     _render_result(st, result)
 
 
+def _cash_basis_text(business_state) -> str:
+    """One-line cash basis with as-of date and a staleness / single-account flag,
+    so the founder sees that runway is a soft, dated input, not a hard verdict."""
+    try:
+        m = business_state.metrics()
+    except Exception:
+        return ""
+    if "cash_balance" not in m:
+        return ""
+    bits = [f"Cash basis: ${m['cash_balance']:,.0f} as of {m.get('cash_as_of', 'unknown')}"]
+    if m.get("cash_single_account"):
+        bits.append("single-account (BlueVine)")
+    bits.append("STALE" if m.get("cash_is_stale") else "current")
+    runway = m.get("runway_months")
+    tail = f", runway about {runway} months" if runway is not None else ""
+    return " · ".join(bits) + tail + ". Treated as a soft, dated input, not a hard solvency verdict."
+
+
 def _render_result(st, result: TriageResult) -> None:
+    basis = st.session_state.get("triage_cash_basis")
+    if basis:
+        st.caption(basis)
     killed_n = len(result.killed)
     st.markdown(
         f"**Considered {result.considered}. Surfaced {len(result.surfaced)}. "

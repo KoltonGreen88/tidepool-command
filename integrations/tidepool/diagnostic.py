@@ -30,7 +30,8 @@ def main() -> None:
     print()
     print(f"  ANTHROPIC_MODEL          = {config.ANTHROPIC_MODEL}")
     print(f"  worksheet/tables         = {config.WORKSHEET}: "
-          f"{config.IDEAINBOX_TABLE}, {config.OUTCOMELOG_TABLE}, {config.ARCHIVE_TABLE}")
+          f"{config.IDEAINBOX_TABLE}, {config.OUTCOMELOG_TABLE}, {config.ARCHIVE_TABLE}, "
+          f"{config.CASHSTATE_TABLE}")
 
 
 if __name__ == "__main__":
