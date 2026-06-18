@@ -150,8 +150,8 @@ with st.spinner("Syncing live data..."):
 
 render_global_banners(ctx)
 
-tab_home, tab_ops, tab_finance, tab_sales, tab_marketing = st.tabs([
-    "HOME", "OPS", "FINANCE", "SALES", "MARKETING"
+tab_home, tab_ops, tab_finance, tab_sales, tab_marketing, tab_ideas = st.tabs([
+    "HOME", "OPS", "FINANCE", "SALES", "MARKETING", "IDEAS"
 ])
 
 with tab_home:
@@ -506,3 +506,10 @@ with tab_marketing:
     st.markdown("")
     st.markdown('<a href="https://tidepool-marketing.streamlit.app" target="_blank" style="color:#00C2A8;font-family:monospace;font-size:0.82rem;text-decoration:none;">Open full Marketing Agent \u2192</a>', unsafe_allow_html=True)
     st.markdown(f'<div class="sync-timestamp">Marketing data via marketing_state.json \u00b7 {mkt.get("last_updated", "")[:19]} UTC</div>', unsafe_allow_html=True)
+
+
+with tab_ideas:
+    # IDEA LOSS triage surface (vendored from KoltonGreen88/idea-loss). Lazy import
+    # so a triage dependency issue never breaks the rest of the dashboard.
+    from integrations.tidepool.command_agent import render_triage_tab
+    render_triage_tab(st)
